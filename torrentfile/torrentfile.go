@@ -1,8 +1,12 @@
 package torrentfile
 
 import (
-	"github.com/jackpal/bencode-go"
 	"io"
+	"net/url"
+	"strconv"
+
+	"github.com/jackpal/bencode-go"
+	"google.golang.org/genproto/googleapis/cloud/aiplatform/v1/schema/predict/params"
 )
 
 type bencodeInfo struct {
@@ -58,4 +62,22 @@ func New(r io.Reader) (*TorrentFile, error) {
 	t, err := bto.toTorrentFile()
 	return &t, err
 
+}
+
+func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, error) {
+	base, err := url.Parse(t.Announce)
+	if err != nil {
+		return "", err
+	}
+	params := url.Values{
+		"info_hash":  []string{string(t.InfoHash[:])},
+		"perr_id":    []string{string(peerID[:])},
+		"port":       []string{strconv.Itoa(int(port))},
+		"uploaded":   []string{"0"},
+		"downloaded": []string{"0"},
+		"compact":    []string{"1"},
+		"left":       []string{strconv.Itoa(t.Length)},
+	}
+	base.RawQuery = params.Encode()
+	return base.User.String(), nil
 }
