@@ -1,12 +1,18 @@
 package torrentfile
 
 import (
+	"bytes"
+	"crypto/sha1"
+	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
+	"github.com/AuroraOps04/bittorrent-cli/peer"
 	"github.com/jackpal/bencode-go"
-	"google.golang.org/genproto/googleapis/cloud/aiplatform/v1/schema/predict/params"
+	"github.com/pkg/errors"
 )
 
 type bencodeInfo struct {
@@ -15,6 +21,17 @@ type bencodeInfo struct {
 	Length      int    `bencode:"length"`
 	Name        string `bencode:"name"`
 }
+
+func (i *bencodeInfo) hash() ([20]byte, error) {
+	var buf bytes.Buffer
+	err := bencode.Marshal(&buf, *i)
+	if err != nil {
+		return [20]byte{}, err
+	}
+	h := sha1.Sum(buf.Bytes())
+	return h, nil
+}
+
 type bencodeTorrent struct {
 	Announce     string      `bencode:"announce"`
 	Info         bencodeInfo `bencode:"info"`
@@ -44,6 +61,10 @@ type TorrentFile struct {
 
 func (bto bencodeTorrent) toTorrentFile() (TorrentFile, error) {
 
+	h, err := bto.Info.hash()
+	if err != nil {
+		return TorrentFile{}, err
+	}
 	var t TorrentFile
 	t.Announce = bto.Announce
 	t.Comment = bto.Comment
@@ -51,6 +72,7 @@ func (bto bencodeTorrent) toTorrentFile() (TorrentFile, error) {
 	t.PieceLength = bto.Info.PieceLength
 	t.Length = bto.Info.Length
 	t.Name = bto.Info.Name
+	t.InfoHash = h
 	return t, nil
 }
 
@@ -71,7 +93,7 @@ func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 	}
 	params := url.Values{
 		"info_hash":  []string{string(t.InfoHash[:])},
-		"perr_id":    []string{string(peerID[:])},
+		"peer_id":    []string{string(peerID[:])},
 		"port":       []string{strconv.Itoa(int(port))},
 		"uploaded":   []string{"0"},
 		"downloaded": []string{"0"},
@@ -79,5 +101,38 @@ func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 		"left":       []string{strconv.Itoa(t.Length)},
 	}
 	base.RawQuery = params.Encode()
-	return base.User.String(), nil
+	return base.String(), nil
+}
+func (t *TorrentFile) GetPeers(peerId [20]byte) ([]peer.Peer, error) {
+	url, err := t.buildTrackerURL(peerId, 6881)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	// 不使用代理
+	c := http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			Proxy: nil,
+		},
+	}
+	resp, err := c.Get(url)
+	if err != nil {
+		return nil, errors.WithMessage(err, "request tracker")
+
+	}
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("request tracker failed status code: %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	var pr peer.TrackerResponse
+	// 解析peers有问题，后面好像多了个peers的个数
+	byteArr, err := io.ReadAll(resp.Body)
+	fmt.Println(string(byteArr))
+	err = bencode.Unmarshal(bytes.NewBuffer(byteArr), &pr)
+	fmt.Println()
+	if err != nil {
+		return nil, errors.WithMessage(err, "unmarshal tracker response")
+	}
+	fmt.Println(len(pr.Peers), pr.Peers)
+	return peer.Unmarshal(pr.Peers)
 }
