@@ -1,4 +1,4 @@
-package p2p
+package client
 
 import (
 	"io"
@@ -34,7 +34,12 @@ func New(p peer.Peer, id, infoHash [20]byte) (*Client, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	// c.Bitfield = bf
+	bt, err := recvBitfield(conn)
+	if err != nil {
+		return nil, errors.WithStack(err)
+
+	}
+	c.Bitfield = bt
 	return c, nil
 }
 
@@ -61,5 +66,5 @@ func completeHandshake(conn net.Conn, peerID, infoHash [20]byte) error {
 }
 
 func recvBitfield(conn net.Conn) (bitfield.Bitfield, error) {
-	return nil, nil
+	return bitfield.Read(conn)
 }

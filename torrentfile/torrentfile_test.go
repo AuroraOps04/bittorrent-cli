@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
+	"github.com/AuroraOps04/bittorrent-cli/client"
 	"github.com/AuroraOps04/bittorrent-cli/peer"
 	"github.com/stretchr/testify/assert"
 )
@@ -93,6 +95,19 @@ func TestGetPeers(t *testing.T) {
 		t.Fatalf("Get peers error: %v", err)
 		return
 	}
-	t.Log(peers)
+	wg := sync.WaitGroup{}
+	wg.Add(len(peers))
+	for _, p := range peers {
+		go func() {
+			defer wg.Done()
+			fmt.Println(p.String())
+			c, err := client.New(p, peer.GetLocalPeerID(), tf.InfoHash)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			fmt.Println(c.Bitfield)
+		}()
+	}
+	wg.Wait()
 }
-
