@@ -3,9 +3,11 @@ package client
 import (
 	"io"
 	"net"
+	"time"
 
 	"github.com/AuroraOps04/bittorrent-cli/bitfield"
 	"github.com/AuroraOps04/bittorrent-cli/handshake"
+	"github.com/AuroraOps04/bittorrent-cli/message"
 	"github.com/AuroraOps04/bittorrent-cli/peer"
 	"github.com/pkg/errors"
 )
@@ -32,15 +34,44 @@ func New(p peer.Peer, id, infoHash [20]byte) (*Client, error) {
 	// handShake
 	err = completeHandshake(conn, id, infoHash)
 	if err != nil {
+		conn.Close()
 		return nil, errors.WithStack(err)
 	}
 	bt, err := recvBitfield(conn)
 	if err != nil {
+		conn.Close()
 		return nil, errors.WithStack(err)
 
 	}
 	c.Bitfield = bt
 	return c, nil
+}
+func (c *Client) Read() (*message.Message, error) {
+	return message.Read(c.Conn)
+}
+func (c *Client) SendRequest(index, begin, length int) error {
+	return nil
+}
+
+// SendInterested sends an Interested message to the peer
+func (c *Client) SendInterested() error {
+	msg := message.Message{ID: message.MsgInterested}
+	_, err := c.Conn.Write(msg.Serialize())
+	return err
+}
+
+// SendNotInterested sends a NotInterested message to the peer
+func (c *Client) SendNotInterested() error {
+	msg := message.Message{ID: message.MsgNotInterested}
+	_, err := c.Conn.Write(msg.Serialize())
+	return err
+}
+
+// SendUnchoke sends an Unchoke message to the peer
+func (c *Client) SendUnchoke() error {
+	msg := message.Message{ID: message.MsgUnchoke}
+	_, err := c.Conn.Write(msg.Serialize())
+	return err
 }
 
 func completeHandshake(conn net.Conn, peerID, infoHash [20]byte) error {
@@ -66,5 +97,21 @@ func completeHandshake(conn net.Conn, peerID, infoHash [20]byte) error {
 }
 
 func recvBitfield(conn net.Conn) (bitfield.Bitfield, error) {
-	return bitfield.Read(conn)
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	defer conn.SetDeadline(time.Time{})
+	// read a message
+	msg, err := message.Read(conn)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	// check message is bitfield Message
+	// keep-alive message
+	if msg == nil {
+		return nil, errors.New("expected bitfield, got nil")
+	}
+	if msg.ID != message.MsgBitfield {
+		return nil, errors.New("expected bitfield, got different message")
+	}
+	// msg.Payload is bitfield
+	return msg.Payload, nil
 }
