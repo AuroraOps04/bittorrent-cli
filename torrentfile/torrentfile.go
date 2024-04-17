@@ -53,7 +53,7 @@ type TorrentFile struct {
 	Comment      string
 	CreationDate int64
 	InfoHash     [20]byte
-	PicesHashes  [][20]byte
+	PieceHashes  [][20]byte
 	PieceLength  int
 	Length       int
 	Name         string
@@ -103,8 +103,8 @@ func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 	base.RawQuery = params.Encode()
 	return base.String(), nil
 }
-func (t *TorrentFile) GetPeers(peerId [20]byte) ([]peer.Peer, error) {
-	url, err := t.buildTrackerURL(peerId, 6881)
+func (t *TorrentFile) GetPeers(peerId [20]byte, port uint16) ([]peer.Peer, error) {
+	url, err := t.buildTrackerURL(peerId, port)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -124,15 +124,13 @@ func (t *TorrentFile) GetPeers(peerId [20]byte) ([]peer.Peer, error) {
 		return nil, fmt.Errorf("request tracker failed status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
-	var pr peer.TrackerResponse
+	trackerResp := peer.TrackerResponse{}
 	// 解析peers有问题，后面好像多了个peers的个数
-	byteArr, err := io.ReadAll(resp.Body)
-	fmt.Println(string(byteArr))
-	err = bencode.Unmarshal(bytes.NewBuffer(byteArr), &pr)
-	fmt.Println()
+	// byteArr, err := io.ReadAll(resp.Body)
+
+	err = bencode.Unmarshal(resp.Body, &trackerResp)
 	if err != nil {
 		return nil, errors.WithMessage(err, "unmarshal tracker response")
 	}
-	fmt.Println(len(pr.Peers), pr.Peers)
-	return peer.Unmarshal(pr.Peers)
+	return peer.Unmarshal([]byte(trackerResp.Peers))
 }

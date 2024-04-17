@@ -8,8 +8,8 @@ import (
 )
 
 type TrackerResponse struct {
-	Interval uint   `bencode:"interval"`
-	Peers    []byte `bencode:"peers"`
+	Interval int    `bencode:"interval"`
+	Peers    string `bencode:"peers"`
 }
 
 type Peer struct {
