@@ -26,22 +26,24 @@ func (h *Handshake) Serialize() []byte {
 }
 
 func Read(r io.Reader) (*Handshake, error) {
-	buf, err := io.ReadAll(r)
+	lengthBuf := make([]byte, 1)
+	_, err := io.ReadFull(r, lengthBuf)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.WithMessage(err, "failed to read pstr length")
 	}
-	if len(buf) == 0{
-		return nil, errors.New("invalid handshake")
+	length := int(lengthBuf[0])
+	anotherBuf := make([]byte, 48+length)
+	_, err = io.ReadFull(r, anotherBuf)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to read the rest of the handshake")
 	}
-	pstrLen := buf[0]
-	if len(buf) != int(pstrLen)+49 {
-		return nil, errors.New("invalid handshake")
+	pstr := string(anotherBuf[0:length])
+	infohash := anotherBuf[length+8 : length+28]
+	peerid := anotherBuf[length+28 : length+48]
+	h := Handshake{
+		Pstr:     pstr,
+		InfoHash: [20]byte(infohash),
+		PeerID:   [20]byte(peerid),
 	}
-	h := Handshake{}
-	h.Pstr = string(buf[1 : 1+pstrLen])
-	// 8 is reserved bytes
-	h.InfoHash = [20]byte(buf[pstrLen+9 : pstrLen+29])
-	h.PeerID = [20]byte(buf[pstrLen+29:])
 	return &h, nil
-
 }
