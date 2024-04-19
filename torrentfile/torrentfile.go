@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/AuroraOps04/bittorrent-cli/peer"
+	"github.com/AuroraOps04/bittorrent-cli/peers"
 	"github.com/jackpal/bencode-go"
 	"github.com/pkg/errors"
 )
@@ -103,7 +103,7 @@ func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 	base.RawQuery = params.Encode()
 	return base.String(), nil
 }
-func (t *TorrentFile) GetPeers(peerId [20]byte, port uint16) ([]peer.Peer, error) {
+func (t *TorrentFile) GetPeers(peerId [20]byte, port uint16) ([]peers.Peer, error) {
 	url, err := t.buildTrackerURL(peerId, port)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -124,7 +124,7 @@ func (t *TorrentFile) GetPeers(peerId [20]byte, port uint16) ([]peer.Peer, error
 		return nil, fmt.Errorf("request tracker failed status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
-	trackerResp := peer.TrackerResponse{}
+	trackerResp := peers.TrackerResponse{}
 	// 解析peers有问题，后面好像多了个peers的个数
 	// byteArr, err := io.ReadAll(resp.Body)
 
@@ -132,5 +132,5 @@ func (t *TorrentFile) GetPeers(peerId [20]byte, port uint16) ([]peer.Peer, error
 	if err != nil {
 		return nil, errors.WithMessage(err, "unmarshal tracker response")
 	}
-	return peer.Unmarshal([]byte(trackerResp.Peers))
+	return peers.Unmarshal([]byte(trackerResp.Peers))
 }

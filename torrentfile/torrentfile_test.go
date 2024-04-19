@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/AuroraOps04/bittorrent-cli/client"
-	"github.com/AuroraOps04/bittorrent-cli/peer"
+	"github.com/AuroraOps04/bittorrent-cli/peers"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +40,7 @@ func TestRequestPeers(t *testing.T) {
 	}
 	peerID := [20]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	const port uint16 = 6882
-	expected := []peer.Peer{
+	expected := []peers.Peer{
 		{IP: net.IP{192, 0, 2, 123}, Port: 6881},
 		{IP: net.IP{127, 0, 0, 1}, Port: 6889},
 	}
@@ -90,18 +90,18 @@ func TestGetPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error create torrentfile: %v", err)
 	}
-	peers, err := tf.GetPeers(peer.GetLocalPeerID(), 6882)
+	peerList, err := tf.GetPeers(peers.GetLocalPeerID(), 6882)
 	if err != nil {
 		t.Fatalf("Get peers error: %v", err)
 		return
 	}
 	wg := sync.WaitGroup{}
-	wg.Add(len(peers))
-	for _, p := range peers {
+	wg.Add(len(peerList))
+	for _, p := range peerList {
 		go func() {
 			defer wg.Done()
 			fmt.Println(p.String())
-			c, err := client.New(p, peer.GetLocalPeerID(), tf.InfoHash)
+			c, err := client.New(p, peers.GetLocalPeerID(), tf.InfoHash)
 			if err != nil {
 				t.Error(err)
 				return

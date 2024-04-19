@@ -8,7 +8,7 @@ import (
 	"github.com/AuroraOps04/bittorrent-cli/bitfield"
 	"github.com/AuroraOps04/bittorrent-cli/handshake"
 	"github.com/AuroraOps04/bittorrent-cli/message"
-	"github.com/AuroraOps04/bittorrent-cli/peer"
+	"github.com/AuroraOps04/bittorrent-cli/peers"
 	"github.com/pkg/errors"
 )
 
@@ -17,10 +17,12 @@ type Client struct {
 	Bitfield bitfield.Bitfield
 	PeerID   [20]byte
 	InfoHash [20]byte
-	Peer     peer.Peer
+	Peer     peers.Peer
+	// Choked is true if the peer is choked
+	Choked bool
 }
 
-func New(p peer.Peer, id, infoHash [20]byte) (*Client, error) {
+func New(p peers.Peer, id, infoHash [20]byte) (*Client, error) {
 	c := &Client{
 		PeerID:   id,
 		Peer:     p,
